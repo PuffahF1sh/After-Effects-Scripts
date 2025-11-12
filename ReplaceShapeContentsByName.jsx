@@ -24,7 +24,7 @@
     for (var i = 0; i < layers.length; i++) {
         var layer = layers[i];
         var lname = layer.name.toLowerCase();
-        if (lname.endsWith("_new")) {
+        if (lname.indexOf("_new") === lname.length - 4) {
             newLayers.push(layer);
         } else {
             oldLayers[lname] = layer;
