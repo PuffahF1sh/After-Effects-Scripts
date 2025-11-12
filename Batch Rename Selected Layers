@@ -1,0 +1,162 @@
+// Make this script target After Effects
+#target aftereffects
+
+{
+    function renameSelectedLayersPanel(thisObj) {
+        // Create the panel
+        var win = thisObj instanceof Panel ? thisObj : new Window("palette", "Batch Rename Selected Layers", undefined, {resizeable:true});
+
+        win.alignChildren = ["fill", "top"];
+        win.spacing = 5;
+        win.margins = 10;
+
+        // Add instructions
+        var instructions = win.add("statictext", undefined, "Select layers in the active composition to rename.");
+        instructions.alignment = ["center", "top"];
+
+        // Add input fields for find, replace, prefix, and suffix
+        var findGroup = win.add("group");
+        findGroup.alignment = ["fill", "top"];
+        findGroup.add("statictext", undefined, "Find:");
+        var findField = findGroup.add("edittext", undefined, "");
+        findField.alignment = ["fill", "top"];
+        findField.characters = 20;
+
+        var replaceGroup = win.add("group");
+        replaceGroup.alignment = ["fill", "top"];
+        replaceGroup.add("statictext", undefined, "Replace With:");
+        var replaceField = replaceGroup.add("edittext", undefined, "");
+        replaceField.alignment = ["fill", "top"];
+        replaceField.characters = 20;
+
+        var prefixGroup = win.add("group");
+        prefixGroup.alignment = ["fill", "top"];
+        prefixGroup.add("statictext", undefined, "Prefix:");
+        var prefixField = prefixGroup.add("edittext", undefined, "");
+        prefixField.alignment = ["fill", "top"];
+        prefixField.characters = 20;
+
+        // Suffix Group
+        var suffixGroup = win.add("group");
+        suffixGroup.alignment = ["fill", "top"];
+        suffixGroup.add("statictext", undefined, "Suffix:");
+        var suffixField = suffixGroup.add("edittext", undefined, "");
+        suffixField.alignment = ["fill", "top"];
+        suffixField.characters = 15;
+        var incrementalSuffixCheckbox = suffixGroup.add("checkbox", undefined, "Add #");
+        incrementalSuffixCheckbox.helpTip = "Check this to add incremental numbering to the suffix.";
+
+        // Numbering Options Panel
+        var numberGroup = win.add("panel", undefined, "Numbering Options");
+        numberGroup.alignChildren = ["fill", "top"];
+        numberGroup.margins = 10;
+        
+        var startGroup = numberGroup.add("group");
+        startGroup.add("statictext", undefined, "Start #:");
+        var startNumberField = startGroup.add("edittext", undefined, "1");
+        startNumberField.characters = 6;
+        
+        var paddingGroup = numberGroup.add("group");
+        paddingGroup.add("statictext", undefined, "Padding:");
+        var paddingField = paddingGroup.add("edittext", undefined, "3");
+        paddingField.characters = 6;
+        paddingField.helpTip = "Number of digits (e.g., 3 gives you 001, 002, ...)";
+
+        // Add Apply button
+        var applyButton = win.add("button", undefined, "Apply Rename");
+        applyButton.alignment = ["fill", "top"];
+
+        // Apply rename and resize functionality
+        applyButton.onClick = function() {
+            // Helper function for number padding
+            function zeroPad(num, width) {
+                var numStr = num.toString();
+                while (numStr.length < width) {
+                    numStr = "0" + numStr;
+                }
+                return numStr;
+            }
+            
+            var activeComp = app.project.activeItem;
+            
+            // --- Error Checking ---
+            if (!activeComp || !(activeComp instanceof CompItem)) {
+                alert("Please select a composition first.");
+                return;
+            }
+            
+            var selectedLayers = activeComp.selectedLayers;
+            
+            if (selectedLayers.length === 0) {
+                alert("Please select one or more layers in the active comp.");
+                return;
+            }
+            // --- End Error Checking ---
+
+
+            app.beginUndoGroup("Batch Rename Selected Layers");
+
+            var findText = findField.text;
+            var replaceText = replaceField.text;
+            var prefix = prefixField.text;
+            var suffix = suffixField.text;
+            
+            var useIncrementalSuffix = incrementalSuffixCheckbox.value;
+            var currentNumber = parseInt(startNumberField.text, 10);
+            var padding = parseInt(paddingField.text, 10);
+            
+            // Fallbacks for numbering
+            if (isNaN(currentNumber)) currentNumber = 1;
+            if (isNaN(padding)) padding = 3;
+
+            // Loop through selected layers
+            for (var i = 0; i < selectedLayers.length; i++) {
+                var layer = selectedLayers[i];
+                var newName;
+                var originalName = layer.name;
+
+                // --- Goal 1: Simple Rename Logic ---
+                if (findText === "") {
+                    // If Find is empty, use Replace With as the new base name.
+                    if (replaceText !== "") {
+                        newName = replaceText;
+                    } else {
+                        // If Find and Replace are both empty, use the original name.
+                        newName = originalName;
+                    }
+                } else {
+                    // Otherwise, perform the normal find/replace.
+                    // Use a regular expression for a global replace, which is safer.
+                    newName = originalName.replace(new RegExp(findText, 'g'), replaceText);
+                }
+
+                // --- Goal 2: Incremental Suffix Logic ---
+                var finalSuffix = suffix;
+                if (useIncrementalSuffix) {
+                    // For layers, it's common to number from top to bottom (index 1 is top)
+                    // or bottom to top. Let's stick with selection order for simplicity.
+                    finalSuffix += zeroPad(currentNumber, padding);
+                    currentNumber++; // Increment *after* using the number
+                }
+
+                // --- Combine Name Parts ---
+                newName = prefix + newName + finalSuffix;
+
+                // Rename the layer
+                layer.name = newName;
+            }
+
+            app.endUndoGroup();
+            alert("Batch renaming of " + selectedLayers.length + " selected layers complete!");
+        };
+
+        win.center();
+        return win;
+    }
+
+    // Run the panel
+    var myPanel = renameSelectedLayersPanel(this);
+    if (myPanel instanceof Window) {
+        myPanel.show();
+    }
+}
